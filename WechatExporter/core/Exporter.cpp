@@ -1001,7 +1001,7 @@ bool Exporter::loadITunes(bool detailedInfo/* = true*/)
 {
     releaseITunes();
     
-    m_iTunesDb = new ITunesDb(m_backup, "Manifest.db");
+    m_iTunesDb = new DecodedWechatITunesDb(m_backup, "Manifest.db");
     if (!detailedInfo)
     {
         std::function<bool(const char*, int)> fn = std::bind(&Exporter::filterITunesFile, this, std::placeholders::_1, std::placeholders::_2);
@@ -1011,7 +1011,7 @@ bool Exporter::loadITunes(bool detailedInfo/* = true*/)
     {
         return false;
     }
-    m_iTunesDbShare = new ITunesDb(m_backup, "Manifest.db");
+    m_iTunesDbShare = new DecodedSharedWechatITunesDb(m_backup, "Manifest.db");
     
     if (!m_iTunesDbShare->load("AppDomainGroup-group.com.tencent.xin"))
     {

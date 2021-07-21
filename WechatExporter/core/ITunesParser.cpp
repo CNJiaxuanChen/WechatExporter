@@ -9,6 +9,7 @@
 #include "ITunesParser.h"
 #include <stdio.h>
 #include <map>
+#include <queue>
 #include <sys/types.h>
 #include <sqlite3.h>
 #include <algorithm>
@@ -22,8 +23,13 @@
 // #define S_IFDIR         0040000         /* [XSI] directory */
 #define S_ISDIR(m)      (((m) & S_IFMT) == S_IFDIR)     /* directory */
 
+#include <shlwapi.h>
+#include <atlstr.h>
+
 #else
 #include <unistd.h>
+#include <dirent.h>
+
 #endif
 
 #include "MbdbReader.h"
@@ -553,12 +559,204 @@ bool ITunesDb::copyFile(const std::string& vpath, const std::string& destPath, c
             bool result = ::copyFile(srcPath, destFullPath, true);
             if (result)
             {
-                updateFileTime(destFullPath, ITunesDb::parseModifiedTime(file->blob));
+                if (file->modifiedTime != 0)
+                {
+                    updateFileTime(destFullPath, static_cast<time_t>(file->modifiedTime));
+                }
+                else if (!file->blob.empty())
+                {
+                    updateFileTime(destFullPath, ITunesDb::parseModifiedTime(file->blob));
+                }
             }
             return result;
         }
     }
     
+    return false;
+}
+
+DecodedWechatITunesDb::DecodedWechatITunesDb(const std::string& rootPath, const std::string& manifestFileName) : ITunesDb(rootPath, manifestFileName)
+{
+    
+}
+
+DecodedWechatITunesDb::~DecodedWechatITunesDb()
+{
+    
+}
+
+bool DecodedWechatITunesDb::load(const std::string& domain, bool onlyFile)
+{
+    return loadFiles(m_rootPath, onlyFile);
+}
+
+bool DecodedWechatITunesDb::loadFiles(const std::string& root, bool onlyFile)
+{
+#ifdef _WIN32
+	std::queue<CString> directories;
+	directories.push("");
+	
+	TCHAR szRoot[MAX_PATH] = { 0 };
+	_tcscpy(szRoot, CW2T(CA2W(root.c_str(), CP_UTF8)));
+	PathAddBackslash(szRoot);
+	
+	TCHAR szPath[MAX_PATH] = { 0 };
+	TCHAR szRelativePath[MAX_PATH] = { 0 };
+	ULARGE_INTEGER ull;
+
+	while (!directories.empty())
+	{
+		const CString& dirName = directories.front();
+
+		PathCombine(szPath, szRoot, dirName);
+		PathAddBackslash(szPath);
+		PathAppend(szPath, TEXT("*.*"));
+
+		WIN32_FIND_DATA FindFileData;
+		HANDLE hFind = INVALID_HANDLE_VALUE;
+
+		hFind = FindFirstFile((LPTSTR)szPath, &FindFileData);
+		if (hFind == INVALID_HANDLE_VALUE)
+		{
+			return false;
+		}
+		do
+		{
+			if (_tcscmp(FindFileData.cFileName, TEXT(".")) == 0 || _tcscmp(FindFileData.cFileName, TEXT("..")) == 0)
+			{
+				continue;
+			}
+			bool isDir = ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
+			
+			PathCombine(szRelativePath, dirName, FindFileData.cFileName);
+			
+			if (!onlyFile || !isDir)
+			{
+				CString relativePath = szRelativePath;
+				relativePath.Replace(DIR_SEP, DIR_SEP_R);
+
+				CW2A pszU8(CT2W(szRelativePath), CP_UTF8);
+
+				ITunesFile *file = new ITunesFile();
+				file->relativePath = (LPCSTR)CW2A(CT2W(relativePath), CP_UTF8);;
+				file->fileId = (LPCSTR)pszU8;
+				file->flags = isDir ? 2 : 1;
+
+				ull.LowPart = FindFileData.ftLastWriteTime.dwLowDateTime;
+				ull.HighPart = FindFileData.ftLastWriteTime.dwHighDateTime;
+
+				file->modifiedTime = static_cast<unsigned int>(ull.QuadPart / 10000000ULL - 11644473600ULL);
+				
+				m_files.push_back(file);
+			}
+
+			if (isDir)
+			{
+				PathAddBackslash(szRelativePath);
+				directories.emplace(szRelativePath);
+			}
+
+		} while (::FindNextFile(hFind, &FindFileData));
+		FindClose(hFind);
+
+		directories.pop();
+	}
+    
+#else
+	std::queue<std::string> directories;
+	directories.push("");
+    struct stat statbuf;
+    
+    while (!directories.empty())
+    {
+        const std::string& dirName = directories.front();
+        std::string path = combinePath(root, dirName);
+        
+        struct dirent *entry = NULL;
+        DIR *dir = opendir(path.c_str());
+        if (dir == NULL)
+        {
+            return false;
+        }
+
+        while ((entry = readdir(dir)) != NULL)
+        {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            {
+                continue;
+            }
+            
+            if (filterFile(dirName, entry->d_name))
+            {
+                continue;
+            }
+            
+            bool isDir = false;
+            
+            std::string relativePath = dirName + entry->d_name;
+
+            lstat(combinePath(path, entry->d_name).c_str(), &statbuf);
+            isDir = S_ISDIR(statbuf.st_mode);
+            
+            if (!onlyFile || !isDir)
+            {
+				std::string fileId = relativePath;
+
+                ITunesFile *file = new ITunesFile();
+                file->relativePath = relativePath;
+                file->fileId = fileId;
+                file->flags = isDir ? 2 : 1;
+                file->modifiedTime = static_cast<unsigned int>(statbuf.st_mtimespec.tv_sec);
+                
+                m_files.push_back(file);
+            }
+            if (isDir)
+            {
+                directories.push(endsWith(relativePath, "/") ? relativePath : (relativePath + "/"));
+            }
+        }
+        closedir(dir);
+        directories.pop();
+    }
+    
+#endif
+    
+    std::sort(m_files.begin(), m_files.end(), __string_less());
+    
+    return true;
+}
+
+std::string DecodedWechatITunesDb::fileIdToRealPath(const std::string& fileId) const
+{
+    if (!fileId.empty())
+    {
+        return combinePath(m_rootPath, fileId);
+    }
+    
+    return std::string();
+}
+
+bool DecodedWechatITunesDb::filterFile(const std::string& relativeDir, const std::string& fileName)
+{
+    return (relativeDir.empty() && fileName.compare("Shared") == 0);
+}
+
+DecodedSharedWechatITunesDb::DecodedSharedWechatITunesDb(const std::string& rootPath, const std::string& manifestFileName) : DecodedWechatITunesDb(rootPath, manifestFileName)
+{
+    m_rootPath = combinePath(m_rootPath, "Shared", "group.com.tencent.xin");
+}
+
+DecodedSharedWechatITunesDb::~DecodedSharedWechatITunesDb()
+{
+}
+
+bool DecodedSharedWechatITunesDb::load(const std::string& domain, bool onlyFile)
+{
+    return loadFiles(m_rootPath, onlyFile);
+}
+
+bool DecodedSharedWechatITunesDb::filterFile(const std::string& relativeDir, const std::string& fileName)
+{
     return false;
 }
 
@@ -586,8 +784,8 @@ bool ManifestParser::parse(std::vector<BackupManifest>& manifests) const
         BackupManifest manifest;
         if (parse(path, manifest) && manifest.isValid())
         {
-            res = true;
             manifests.push_back(manifest);
+            res = true;
         }
     }
     else
@@ -622,8 +820,8 @@ bool ManifestParser::parseDirectory(const std::string& path, std::vector<BackupM
         BackupManifest manifest;
         if (parse(backupPath, manifest) && manifest.isValid())
         {
-            res = true;
             manifests.push_back(manifest);
+            res = true;
         }
     }
 
@@ -861,4 +1059,73 @@ void PlistDictionary::characters(const std::string& ch)
     {
         m_valueBuffer.append(ch);
     }
+}
+
+DecodedManifestParser::DecodedManifestParser(const std::string& manifestPath) : ManifestParser(manifestPath)
+{
+}
+
+bool DecodedManifestParser::parse(std::vector<BackupManifest>& manifests) const
+{
+    bool res = false;
+    
+    std::string path = normalizePath(m_manifestPath);
+    if (isValidBackupItem(path))
+    {
+        BackupManifest manifest;
+        if (parse(path, manifest) && manifest.isValid())
+        {
+            manifests.push_back(manifest);
+            res = true;
+        }
+    }
+    
+    return res;
+}
+
+bool DecodedManifestParser::isValidBackupItem(const std::string& path) const
+{
+    std::string fileName = combinePath(path, "Documents", "LoginInfo2.dat");
+    if (!existsFile(fileName))
+    {
+        m_lastError += "LoginInfo2.dat not found\r\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool DecodedManifestParser::parse(const std::string& path, BackupManifest& manifest) const
+{
+    std::string fileName = combinePath(path, "Documents", "LoginInfo2.dat");
+    if (!existsFile(fileName))
+    {
+        m_lastError += "LoginInfo2.dat not found\r\n";
+        return false;
+    }
+    
+	manifest.setPath(path);
+    
+#ifdef _WIN32
+	struct _stat statbuf;
+	CA2W wpath(path.c_str(), CP_UTF8);
+	_wstat((LPCWSTR)wpath, &statbuf);
+	std::time_t ts = statbuf.st_mtime;
+#else
+    struct stat statbuf;
+    lstat(fileName.c_str(), &statbuf);
+    std::time_t ts = statbuf.st_mtimespec.tv_sec;
+    
+#endif
+	std::tm * ptm = std::localtime(&ts);
+
+    char buffer[32];
+    std::strftime(buffer, 32, "%Y-%m-%d %H:%M", ptm);
+    
+    manifest.setDeviceName("localhost");
+    manifest.setDisplayName("Wechat Backup");
+    
+    manifest.setBackupTime(buffer);
+
+    return true;
 }

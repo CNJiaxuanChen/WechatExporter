@@ -178,9 +178,10 @@
     NSString *backupDir = [AppConfiguration getDefaultBackupDir:YES];
     if (nil != backupDir)
     {
-        ManifestParser parser([backupDir UTF8String]);
+        // std::unique_ptr<ManifestParser> parser(new ManifestParser([backupDir UTF8String]));
+        std::unique_ptr<ManifestParser> parser(new DecodedManifestParser([backupDir UTF8String]));
         std::vector<BackupManifest> manifests;
-        if (parser.parse(manifests))
+        if (parser->parse(manifests))
         {
             NSString *previoudBackupDir = [AppConfiguration getLastBackupDir];
             [self updateBackups:manifests withPreviousPath:previoudBackupDir];
@@ -373,9 +374,9 @@
         {
             NSURL *backupUrl = panel.directoryURL;
             
-            ManifestParser parser([backupUrl.path UTF8String]);
+            std::unique_ptr<ManifestParser> parser(new DecodedManifestParser([backupUrl.path UTF8String]));
             std::vector<BackupManifest> manifests;
-            if (parser.parse(manifests) && !manifests.empty())
+            if (parser->parse(manifests) && !manifests.empty())
             {
                 [self updateBackups:manifests withPreviousPath:nil];
             }

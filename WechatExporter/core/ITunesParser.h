@@ -26,7 +26,7 @@ struct ITunesFile
     unsigned int modifiedTime;
     std::vector<unsigned char> blob;
     
-    ITunesFile()
+    ITunesFile() : flags(0), modifiedTime(0)
     {
     }
     
@@ -151,7 +151,7 @@ class ITunesDb
 {
 public:
     ITunesDb(const std::string& rootPath, const std::string& manifestFileName);
-    ~ITunesDb();
+    virtual ~ITunesDb();
     
     std::string getVersion() const
     {
@@ -170,7 +170,7 @@ public:
     
     bool load();
     bool load(const std::string& domain);
-    bool load(const std::string& domain, bool onlyFile);
+    virtual bool load(const std::string& domain, bool onlyFile);
     // bool loadSessions();
     
     const ITunesFile* findITunesFile(const std::string& relativePath) const;
@@ -190,7 +190,7 @@ public:
     
 protected:
     bool loadMbdb(const std::string& domain, bool onlyFile);
-    std::string fileIdToRealPath(const std::string& fileId) const;
+    virtual std::string fileIdToRealPath(const std::string& fileId) const;
     
 protected:
     bool m_isMbdb;
@@ -200,6 +200,32 @@ protected:
     std::string m_version;
     std::string m_iOSVersion;
     std::function<bool(const char *, int flags)> m_loadingFilter;
+};
+
+class DecodedWechatITunesDb : public ITunesDb
+{
+public:
+    DecodedWechatITunesDb(const std::string& rootPath, const std::string& manifestFileName);
+    ~DecodedWechatITunesDb();
+    
+    virtual bool load(const std::string& domain, bool onlyFile);
+    
+protected:
+    bool loadFiles(const std::string& root, bool onlyFile);
+    virtual std::string fileIdToRealPath(const std::string& fileId) const;
+    virtual bool filterFile(const std::string& relativeDir, const std::string& fileName);
+};
+
+class DecodedSharedWechatITunesDb : public DecodedWechatITunesDb
+{
+public:
+    DecodedSharedWechatITunesDb(const std::string& rootPath, const std::string& manifestFileName);
+    ~DecodedSharedWechatITunesDb();
+    
+    virtual bool load(const std::string& domain, bool onlyFile);
+    
+protected:
+    virtual bool filterFile(const std::string& relativeDir, const std::string& fileName);
 };
 
 template<class TFilter>
@@ -241,17 +267,29 @@ protected:
 
 public:
     ManifestParser(const std::string& manifestPath);
-    bool parse(std::vector<BackupManifest>& manifets) const;
+    virtual ~ManifestParser() {}
+    virtual bool parse(std::vector<BackupManifest>& manifets) const;
 	std::string getLastError() const;
 
     friend ITunesDb;
     
 protected:
     bool parseDirectory(const std::string& path, std::vector<BackupManifest>& manifests) const;
-    bool parse(const std::string& path, BackupManifest& manifest) const;
-	bool isValidBackupItem(const std::string& path) const;
+    virtual bool parse(const std::string& path, BackupManifest& manifest) const;
+	virtual bool isValidBackupItem(const std::string& path) const;
     
     static bool parseInfoPlist(const std::string& backupIdPath, BackupManifest& manifest);
+};
+
+class DecodedManifestParser : public ManifestParser
+{
+public:
+    DecodedManifestParser(const std::string& manifestPath);
+    virtual bool parse(std::vector<BackupManifest>& manifets) const;
+    
+protected:
+    virtual bool parse(const std::string& path, BackupManifest& manifest) const;
+    virtual bool isValidBackupItem(const std::string& path) const;
 };
 
 #endif /* ITunesParser_h */

@@ -224,15 +224,19 @@ public:
 		if (!backupDir.IsEmpty())
 		{
 			CW2A backupDir(CT2W(backupDir), CP_UTF8);
-			ManifestParser parser((LPCSTR)backupDir);
-			parser.parse(manifests);
+			// ManifestParser parser((LPCSTR)backupDir);
+			// unique_ptr<ManifestParser> parser(new ManifestParser((LPCSTR)backupDir));
+			std::unique_ptr<ManifestParser> parser(new DecodedManifestParser((LPCSTR)backupDir));
+			parser->parse(manifests);
 		}
 #ifndef NDEBUG
 		if (!lastBackupDir.IsEmpty() && lastBackupDir != backupDir)
 		{
 			CW2A backupDir(CT2W(lastBackupDir), CP_UTF8);
-			ManifestParser parser((LPCSTR)backupDir);
-			parser.parse(manifests);
+			// ManifestParser parser((LPCSTR)backupDir);
+			// unique_ptr<ManifestParser> parser(new ManifestParser((LPCSTR)backupDir));
+			std::unique_ptr<ManifestParser> parser(new DecodedManifestParser((LPCSTR)backupDir));
+			parser->parse(manifests);
 		}
 #endif
 		if (!manifests.empty())
@@ -427,9 +431,10 @@ public:
 		{
 			CW2A backupDir(CT2W(folder.m_szFolderPath), CP_UTF8);
 
-			ManifestParser parser((LPCSTR)backupDir);
+			// ManifestParser parser((LPCSTR)backupDir);
+			std::unique_ptr<ManifestParser> parser(new DecodedManifestParser((LPCSTR)backupDir));
 			std::vector<BackupManifest> manifests;
-			if (parser.parse(manifests) && !manifests.empty())
+			if (parser->parse(manifests) && !manifests.empty())
 			{
 				UpdateBackups(manifests);
 #ifndef NDEBUG
@@ -438,7 +443,7 @@ public:
 			}
 			else
 			{
-				m_logger->debug(parser.getLastError());
+				m_logger->debug(parser->getLastError());
 				MsgBox(m_hWnd, IDS_FAILED_TO_LOAD_BKP);
 			}
 		}
