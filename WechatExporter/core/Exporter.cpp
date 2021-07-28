@@ -766,6 +766,10 @@ int Exporter::exportSession(const Friend& user, const MessageParser& msgParser, 
     int64_t maxMsgId = 0;
     m_exportContext->getMaxId(session.getUsrName(), maxMsgId);
     
+    
+#if !defined(NDEBUG) || defined(DBG_PERF)
+    m_logger->debug("DB: " + session.getDbFile() + " Table: Chat_" + session.getHash());
+#endif
     int numberOfMsgs = 0;
     SessionParser sessionParser(m_options);
     std::unique_ptr<SessionParser::MessageEnumerator> enumerator(sessionParser.buildMsgEnumerator(session, maxMsgId));
