@@ -243,11 +243,11 @@ public:
     inline std::string getUsrName() const { return m_usrName; }
     inline std::string getHash() const { return m_uidHash; }
     void setUsrName(const std::string& usrName) { this->m_usrName = usrName; m_uidHash = md5(usrName);  m_outputFileName = m_uidHash; m_isChatroom = isChatroom(usrName); }
-    bool isUsrNameEmpty() const
+    inline bool isUsrNameEmpty() const
     {
         return m_usrName.empty();
     }
-    bool isHashEmpty() const
+    inline bool isHashEmpty() const
     {
         return m_uidHash.empty();
     }
