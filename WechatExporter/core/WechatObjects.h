@@ -243,6 +243,14 @@ public:
     inline std::string getUsrName() const { return m_usrName; }
     inline std::string getHash() const { return m_uidHash; }
     void setUsrName(const std::string& usrName) { this->m_usrName = usrName; m_uidHash = md5(usrName);  m_outputFileName = m_uidHash; m_isChatroom = isChatroom(usrName); }
+    bool isUsrNameEmpty() const
+    {
+        return m_usrName.empty();
+    }
+    bool isHashEmpty() const
+    {
+        return m_uidHash.empty();
+    }
 
     bool containMember(const std::string& uidHash) const
     {
@@ -411,6 +419,7 @@ public:
     std::map<std::string, Friend> friends;  // uidHash => Friend
     std::map<std::string, std::string> hashes;  // uid => Hash
     
+    /*
     template <class THandler>
     void handleFriend(THandler handler)
     {
@@ -419,6 +428,7 @@ public:
             handler(it->second);
         }
     }
+     */
     
     bool hasFriend(const std::string& hash) const { return friends.find(hash) != friends.end(); }
     const Friend* getFriend(const std::string& uidHash) const
@@ -501,12 +511,21 @@ protected:
     std::string m_extFileName;
     std::string m_dbFile;
     void *m_data;
-    
+    bool m_deleted;
     const Friend* m_owner;
     
 public:
-    Session(const Friend* owner) : Friend(), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_owner(owner)
+    Session(const Friend* owner) : Friend(), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_deleted(false), m_owner(owner)
     {
+    }
+    
+    Session(const std::string& uid, const std::string& hash, const Friend* owner) : Friend(uid, hash), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_deleted(false), m_owner(owner)
+    {
+    }
+    
+    inline std::string getDisplayName() const
+    {
+        return m_deleted ? Friend::getDisplayName() + "(deleted!)" : Friend::getDisplayName();
     }
     
     inline unsigned int getCreateTime() const
@@ -592,6 +611,16 @@ public:
     bool update(const Friend& f)
     {
         return Friend::update(f);
+    }
+    
+    bool isDeleted() const
+    {
+        return m_deleted;
+    }
+    
+    void setDeleted(bool deleted)
+    {
+        m_deleted = deleted;
     }
     
     const Friend* getOwner() const
