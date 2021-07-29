@@ -525,7 +525,7 @@ public:
     
     inline std::string getDisplayName() const
     {
-        return m_deleted ? Friend::getDisplayName() + "(deleted!)" : Friend::getDisplayName();
+        return m_deleted ? Friend::getDisplayName() + "-deleted" : Friend::getDisplayName();
     }
     
     inline unsigned int getCreateTime() const
