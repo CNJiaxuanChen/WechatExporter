@@ -280,7 +280,7 @@ public:
         }
     }
     
-    inline std::string getDisplayName() const
+    virtual std::string getDisplayName() const
     {
         return m_displayName.empty() ? m_usrName : m_displayName;
     }
@@ -292,6 +292,10 @@ public:
     
     inline void setDisplayName(const std::string& displayName)
     {
+		if (displayName == "CN")
+		{
+			int aa = 0;
+		}
         m_displayName = displayName;
     }
     
@@ -523,7 +527,7 @@ public:
     {
     }
     
-    inline std::string getDisplayName() const
+    std::string getDisplayName() const
     {
         return m_deleted ? Friend::getDisplayName() + "-deleted" : Friend::getDisplayName();
     }
