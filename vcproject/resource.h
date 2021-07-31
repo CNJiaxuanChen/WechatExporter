@@ -30,6 +30,7 @@
 #define IDS_HIDE_LOGS                   151
 #define IDS_STRING152                   152
 #define IDS_VERSIONS                    152
+#define IDS_DELETED_SESSION             153
 #define IDC_BACKUP                      1000
 #define IDC_CHOOSE_BKP                  1001
 #define IDC_OUTPUT                      1002

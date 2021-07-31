@@ -214,6 +214,7 @@ protected:
     std::string m_displayName;
     int m_userType;
     bool m_isChatroom;
+    bool m_deleted;
     std::string m_portrait;
     std::string m_portraitHD;
     
@@ -223,11 +224,11 @@ protected:
     
 public:
     
-    Friend() : m_isChatroom(false)
+    Friend() : m_isChatroom(false), m_deleted(false)
     {
     }
     
-    Friend(const std::string& uid, const std::string& hash) : m_usrName(uid), m_uidHash(hash)
+    Friend(const std::string& uid, const std::string& hash) : m_usrName(uid), m_uidHash(hash), m_deleted(false)
     {
         m_isChatroom = isChatroom(uid);
     }
@@ -251,6 +252,8 @@ public:
     {
         return m_uidHash.empty();
     }
+    
+    void setEmptyUsrName(const std::string& usrName) { this->m_usrName = usrName; }
 
     bool containMember(const std::string& uidHash) const
     {
@@ -280,7 +283,7 @@ public:
         }
     }
     
-    virtual std::string getDisplayName() const
+    std::string getDisplayName() const
     {
         return m_displayName.empty() ? m_usrName : m_displayName;
     }
@@ -292,10 +295,6 @@ public:
     
     inline void setDisplayName(const std::string& displayName)
     {
-		if (displayName == "CN")
-		{
-			int aa = 0;
-		}
         m_displayName = displayName;
     }
     
@@ -357,12 +356,26 @@ public:
         return m_usrName + ".jpg";
     }
     
+    bool isDeleted() const
+    {
+        return m_deleted;
+    }
+    
+    void setDeleted(bool deleted)
+    {
+        m_deleted = deleted;
+    }
+    
 protected:
     bool update(const Friend& f)
     {
-        if (m_usrName != f.m_usrName)
+        if (!f.isUsrNameEmpty() && m_usrName != f.m_usrName)
         {
             return false;
+        }
+        else if (isUsrNameEmpty())
+        {
+            setUsrName(f.getUsrName());
         }
         
         if (m_displayName.empty() && !f.m_displayName.empty())
@@ -515,23 +528,17 @@ protected:
     std::string m_extFileName;
     std::string m_dbFile;
     void *m_data;
-    bool m_deleted;
     const Friend* m_owner;
     
 public:
-    Session(const Friend* owner) : Friend(), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_deleted(false), m_owner(owner)
+    Session(const Friend* owner) : Friend(), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_owner(owner)
     {
     }
     
-    Session(const std::string& uid, const std::string& hash, const Friend* owner) : Friend(uid, hash), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_deleted(false), m_owner(owner)
+    Session(const std::string& uid, const std::string& hash, const Friend* owner) : Friend(uid, hash), m_unreadCount(0), m_recordCount(0), m_createTime(0), m_lastMessageTime(0), m_data(NULL), m_owner(owner)
     {
     }
-    
-    std::string getDisplayName() const
-    {
-        return m_deleted ? Friend::getDisplayName() + "-deleted" : Friend::getDisplayName();
-    }
-    
+
     inline unsigned int getCreateTime() const
     {
         return m_createTime;
@@ -617,15 +624,7 @@ public:
         return Friend::update(f);
     }
     
-    bool isDeleted() const
-    {
-        return m_deleted;
-    }
     
-    void setDeleted(bool deleted)
-    {
-        m_deleted = deleted;
-    }
     
     const Friend* getOwner() const
     {
@@ -633,6 +632,19 @@ public:
     }
     
     
+};
+
+struct SessionUsrNameCompare
+{
+    bool operator()(const Session& s1, const Session& s2) const
+    {
+        return s1.getUsrName().compare(s2.getUsrName()) < 0;
+    }
+    
+    bool operator()(const Session& s1, const std::string& s2) const
+    {
+        return s1.getUsrName().compare(s2) < 0;
+    }
 };
 
 struct SessionHashCompare

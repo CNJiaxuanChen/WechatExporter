@@ -191,6 +191,7 @@ BEGIN
     IDS_SHOW_LOGS           "显示日志"
     IDS_HIDE_LOGS           "隐藏日志"
     IDS_VERSIONS            "iTunes版本：%s, iOS版本：%s, 微信版本：%s"
+    IDS_DELETED_SESSION     "(已删除)"
 END
 
 #endif    // Chinese (Simplified, PRC) resources
@@ -449,6 +450,7 @@ BEGIN
     IDS_SHOW_LOGS           "Show Logs"
     IDS_HIDE_LOGS           "Hide Logs"
     IDS_VERSIONS            "iTunes Version: %s, iOS Version: %s, Wechat Version: %s"
+    IDS_DELETED_SESSION     "(Deleted)"
 END
 
 STRINGTABLE
